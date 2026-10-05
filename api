@@ -98,10 +98,6 @@ local KeyNames = {
     [Enum.KeyCode.Space] = "SPC",
 }
 
-local function lerp(a, b, t)
-    return a + (b - a) * t
-end
-
 local function new(class, props)
     local instance = Instance.new(class)
     for k, v in pairs(props or {}) do
@@ -173,18 +169,29 @@ local function removePopupsChecked(id)
     end
 end
 
+local function findScreenGui(instance)
+    local current = instance
+    while current and not current:IsA("ScreenGui") do
+        current = current.Parent
+    end
+    return current
+end
+
 local Button = {}
 Button.__index = Button
 
 function Button.new(parent, options)
     local self = setmetatable({}, Button)
+    options = options or {}
     self.Title = options.title or "button"
     self.Callback = options.callback or function() end
     self.Flag = getNextFlag()
 
+    local targetParent = options.customParent or parent.Frame or parent
+
     local frame = new("Frame", {
         Name = "ButtonHolder",
-        Parent = parent,
+        Parent = targetParent,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         Size = udim2(0, 159, 0, 23),
@@ -243,6 +250,7 @@ function Button.new(parent, options)
 
     self.Instance = frame
     self.Button = btn
+    self.Frame = frame
     self.Set = function(_, value)
         State.Flags[self.Flag] = value
     end
@@ -376,14 +384,15 @@ function Toggle.new(parent, options, customParent)
             ZIndex = 2
         })
 
+        local rootGui = findScreenGui(frame) or CoreGui
         local tooltip = new("Frame", {
             Name = "InfoTooltip",
-            Parent = CoreGui,
+            Parent = rootGui,
             BackgroundColor3 = color(15, 15, 15),
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
             Visible = false,
-            ZIndex = 10,
+            ZIndex = 999,
             AutomaticSize = Enum.AutomaticSize.XY
         })
 
@@ -687,6 +696,7 @@ function Slider.new(parent, options, customParent)
     end
 
     self.Instance = frame
+    self.Frame = frame
     self.Parent = parent
     return self
 end
@@ -756,7 +766,8 @@ function Dropdown.new(parent, options, customParent)
         TextXAlignment = Enum.TextXAlignment.Left,
         TextSize = 12,
         TextTruncate = Enum.TextTruncate.AtEnd,
-        ZIndex = 2
+        ZIndex = 2,
+        ClipsDescendants = false
     })
 
     new("UICorner", {
@@ -799,16 +810,20 @@ function Dropdown.new(parent, options, customParent)
         ZIndex = 3
     })
 
+    local rootGui = findScreenGui(frame) or CoreGui
+
     local inline = new("Frame", {
         Name = "Inline",
-        Parent = openButton,
+        Parent = rootGui,
         BackgroundColor3 = color(15, 15, 15),
         BorderColor3 = color(0, 0, 0),
         BorderSizePixel = 0,
-        Position = udim2(0, 0, 1, 0),
-        Size = udim2(1, 0, 0, 0),
+        Position = udim2(0, 0, 0, 0),
+        Size = udim2(0, 159, 0, 0),
         Visible = false,
-        ZIndex = 4
+        ZIndex = 100,
+        AutomaticSize = Enum.AutomaticSize.Y,
+        ClipsDescendants = false
     })
 
     new("UICorner", { Name = "InlineCorner", Parent = inline, CornerRadius = UDim.new(0, 3) })
@@ -823,7 +838,8 @@ function Dropdown.new(parent, options, customParent)
     new("UIListLayout", {
         Name = "InlineList",
         Parent = inline,
-        SortOrder = Enum.SortOrder.LayoutOrder
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 2)
     })
 
     local inlineAPI = {}
@@ -832,6 +848,11 @@ function Dropdown.new(parent, options, customParent)
         inline.Visible = true
         TweenService:Create(arrow, TweenInfo.new(0.15), { Rotation = 180 }):Play()
         TweenService:Create(inline, TweenInfo.new(0.15), { BackgroundTransparency = 0 }):Play()
+        inline.Position = UDim2.fromOffset(
+            openButton.AbsolutePosition.X,
+            openButton.AbsolutePosition.Y + openButton.AbsoluteSize.Y + 2
+        )
+        inline.Size = UDim2.fromOffset(openButton.AbsoluteSize.X, 0)
         fadeIn(inline)
     end
 
@@ -861,7 +882,6 @@ function Dropdown.new(parent, options, customParent)
             Parent = inline,
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
-            Position = udim2(1, 0, 0, 0),
             Size = udim2(1, 0, 0, 20),
             AutoButtonColor = false,
             FontFace = Fonts.Default,
@@ -888,7 +908,7 @@ function Dropdown.new(parent, options, customParent)
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
             Position = udim2(0.013, 0, 0, 0),
-            Size = udim2(0, 40, 1, 0),
+            Size = udim2(1, -6, 1, 0),
             FontFace = Fonts.Default,
             Text = value,
             TextColor3 = color(129, 129, 127),
@@ -898,7 +918,6 @@ function Dropdown.new(parent, options, customParent)
         })
 
         objects.Name = name
-        inline.Size = inline.Size + udim2(0, 0, 0, 22)
 
         local function click()
             name.TextColor3 = Theme.accent
@@ -946,8 +965,8 @@ function Dropdown.new(parent, options, customParent)
             if #inner.FValue > 0 then
                 for _, v in pairs(inner.FValue) do
                     table.insert(list, v)
-                    text.Text = table.concat(list, ", ")
                 end
+                text.Text = table.concat(list, ", ")
             else
                 text.Text = "-"
             end
@@ -1008,7 +1027,6 @@ function Dropdown.new(parent, options, customParent)
         for _, data in pairs(inner.FValues) do
             data.Objects.Name:Destroy()
         end
-        inline.Size = udim2(0, 159, 0, 0)
         table.clear(inner.FValues)
         if self.Multi then
             table.clear(inner.FValue)
@@ -1041,10 +1059,8 @@ function Dropdown.new(parent, options, customParent)
         removePopupsChecked(frame.Name)
         if inline.Visible then
             inlineAPI:Close()
-            inline.ZIndex = 2
         else
             newPopup({ Remove = inlineAPI.Close, ID = frame.Name })
-            inline.ZIndex = 4
             inlineAPI:Open()
         end
     end)
@@ -1453,15 +1469,17 @@ function Colorpicker.new(parent, options, customParent)
         CornerRadius = UDim.new(0, 4)
     })
 
+    local rootGui = findScreenGui(frame) or CoreGui
+
     local inline = new("Frame", {
         Name = "ColorpickerInline",
-        Parent = holder,
+        Parent = rootGui,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        Position = customParent and udim2(1, -16, 0, 0) or udim2(1, 0, 0, 0),
-        Size = udim2(0, 13, 0, 13),
+        Position = udim2(0, 0, 0, 0),
+        Size = udim2(0, 136, 0, 159),
         Visible = false,
-        ZIndex = 13
+        ZIndex = 100
     })
 
     new("UICorner", { Name = "CPInlineCorner", Parent = inline, CornerRadius = UDim.new(0, 2) })
@@ -1471,8 +1489,8 @@ function Colorpicker.new(parent, options, customParent)
         Parent = inline,
         BackgroundColor3 = color(23, 23, 23),
         BorderColor3 = color(0, 0, 0),
-        Position = customParent and udim2(1, 4, 0, 0) or udim2(-9.46, 0, 0, 0),
-        Size = udim2(0, 136, 0, 159),
+        Position = udim2(0, 0, 0, 0),
+        Size = udim2(1, 0, 1, 0),
         ZIndex = 13
     })
 
@@ -1639,6 +1657,10 @@ function Colorpicker.new(parent, options, customParent)
         content.Visible = true
         inline.Visible = true
         content.BackgroundTransparency = 0
+        inline.Position = UDim2.fromOffset(
+            openBtn.AbsolutePosition.X - 136 + 13,
+            openBtn.AbsolutePosition.Y + 15
+        )
         pickerAPI:FadeIn()
     end
 
@@ -1956,7 +1978,7 @@ function Section.new(tab, name, side)
 end
 
 function Section:Button(options)
-    local button = Button.new(self.Frame, options)
+    local button = Button.new(self, options)
     table.insert(self.Components, button)
     return button
 end
@@ -2216,7 +2238,8 @@ function Window.new(options)
         Name = "ScreenGui",
         Parent = parentGui,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-        ResetOnSpawn = false
+        ResetOnSpawn = false,
+        DisplayOrder = 999
     })
 
     self.Container.BackgroundFrame = new("Frame", {
@@ -2226,7 +2249,8 @@ function Window.new(options)
         BorderColor3 = color(0, 0, 0),
         BorderSizePixel = 0,
         Size = udim2(0, 562, 0, 459),
-        Position = udim2(0, 527, 0, 168)
+        Position = udim2(0, 527, 0, 168),
+        Active = true
     })
 
     new("UICorner", { Name = "BackgroundCorner", Parent = self.Container.BackgroundFrame })
@@ -2239,6 +2263,16 @@ function Window.new(options)
         Color = color(31, 33, 31)
     })
 
+    self.Container.TopBar = new("Frame", {
+        Name = "TopBar",
+        Parent = self.Container.BackgroundFrame,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Size = udim2(1, 0, 0, 32),
+        Position = udim2(0, 0, 0, 0),
+        ZIndex = 5
+    })
+
     self.Container.TabsList = new("Frame", {
         Name = "TabsList",
         Parent = self.Container.BackgroundFrame,
@@ -2246,7 +2280,8 @@ function Window.new(options)
         BorderColor3 = color(0, 0, 0),
         BorderSizePixel = 0,
         Size = udim2(0, 430, 0, 16),
-        Position = udim2(0, 98, 0, 16)
+        Position = udim2(0, 98, 0, 16),
+        ZIndex = 5
     })
 
     new("TextLabel", {
@@ -2261,7 +2296,8 @@ function Window.new(options)
         TextColor3 = color(255, 255, 255),
         TextSize = 12,
         FontFace = Fonts.Default,
-        TextXAlignment = Enum.TextXAlignment.Left
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 5
     })
 
     new("UIListLayout", {
@@ -2336,7 +2372,17 @@ function Window.new(options)
     local dragStart, startPos
 
     self.Container.BackgroundFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+            return
+        end
+        local mousePos = UserInputService:GetMouseLocation()
+        local topBarAbs = self.Container.TopBar.AbsolutePosition
+        local topBarSize = self.Container.TopBar.AbsoluteSize
+        local insideTopBar = mousePos.X >= topBarAbs.X
+            and mousePos.X <= topBarAbs.X + topBarSize.X
+            and mousePos.Y >= topBarAbs.Y - 36
+            and mousePos.Y <= topBarAbs.Y + topBarSize.Y - 36
+        if insideTopBar then
             dragging = true
             dragStart = input.Position
             startPos = self.Container.BackgroundFrame.Position
