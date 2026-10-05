@@ -766,8 +766,7 @@ function Dropdown.new(parent, options, customParent)
         TextXAlignment = Enum.TextXAlignment.Left,
         TextSize = 12,
         TextTruncate = Enum.TextTruncate.AtEnd,
-        ZIndex = 2,
-        ClipsDescendants = false
+        ZIndex = 2
     })
 
     new("UICorner", {
@@ -810,20 +809,16 @@ function Dropdown.new(parent, options, customParent)
         ZIndex = 3
     })
 
-    local rootGui = findScreenGui(frame) or CoreGui
-
     local inline = new("Frame", {
         Name = "Inline",
-        Parent = rootGui,
+        Parent = openButton,
         BackgroundColor3 = color(15, 15, 15),
         BorderColor3 = color(0, 0, 0),
         BorderSizePixel = 0,
-        Position = udim2(0, 0, 0, 0),
-        Size = udim2(0, 159, 0, 0),
+        Position = udim2(0, 0, 1, 0),
+        Size = udim2(1, 0, 0, 0),
         Visible = false,
-        ZIndex = 100,
-        AutomaticSize = Enum.AutomaticSize.Y,
-        ClipsDescendants = false
+        ZIndex = 4
     })
 
     new("UICorner", { Name = "InlineCorner", Parent = inline, CornerRadius = UDim.new(0, 3) })
@@ -838,8 +833,7 @@ function Dropdown.new(parent, options, customParent)
     new("UIListLayout", {
         Name = "InlineList",
         Parent = inline,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 2)
+        SortOrder = Enum.SortOrder.LayoutOrder
     })
 
     local inlineAPI = {}
@@ -848,12 +842,18 @@ function Dropdown.new(parent, options, customParent)
         inline.Visible = true
         TweenService:Create(arrow, TweenInfo.new(0.15), { Rotation = 180 }):Play()
         TweenService:Create(inline, TweenInfo.new(0.15), { BackgroundTransparency = 0 }):Play()
-        inline.Position = UDim2.fromOffset(
-            openButton.AbsolutePosition.X,
-            openButton.AbsolutePosition.Y + openButton.AbsoluteSize.Y + 2
-        )
-        inline.Size = UDim2.fromOffset(openButton.AbsoluteSize.X, 0)
         fadeIn(inline)
+
+        local screenGui = findScreenGui(openButton)
+        if screenGui then
+            local worldPos = openButton.AbsolutePosition
+            local worldSize = openButton.AbsoluteSize
+            inline.Parent = screenGui
+            inline.Position = UDim2.fromOffset(worldPos.X, worldPos.Y + worldSize.Y + 2)
+            inline.Size = UDim2.fromOffset(worldSize.X, 0)
+            inline.AutomaticSize = Enum.AutomaticSize.Y
+            inline.ZIndex = 500
+        end
     end
 
     function inlineAPI:FadeIn()
@@ -870,6 +870,9 @@ function Dropdown.new(parent, options, customParent)
         fadeOut(inline)
         task.wait(0.15)
         inline.Visible = false
+        inline.Parent = openButton
+        inline.Position = udim2(0, 0, 1, 0)
+        inline.Size = udim2(1, 0, 0, 0)
     end
 
     function inner:CreateValue(value)
@@ -1027,6 +1030,7 @@ function Dropdown.new(parent, options, customParent)
         for _, data in pairs(inner.FValues) do
             data.Objects.Name:Destroy()
         end
+        inline.Size = udim2(0, 159, 0, 0)
         table.clear(inner.FValues)
         if self.Multi then
             table.clear(inner.FValue)
